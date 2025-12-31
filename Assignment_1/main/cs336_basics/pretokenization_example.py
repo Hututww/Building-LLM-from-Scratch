@@ -1,7 +1,6 @@
 import os
 from typing import BinaryIO
 
-
 def find_chunk_boundaries(
     file: BinaryIO,
     desired_num_chunks: int,
