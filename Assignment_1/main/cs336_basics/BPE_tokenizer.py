@@ -62,15 +62,82 @@ class Tokenizer:
                 merges.append((b1, b2))
         return cls(vocab, merges, special_tokens)
 
+    # 为了在encode里面方便写东西，得加俩函数，_pre_tokenize()做预分词，_apply_merge()做合并
+    def _pre_tokenize(self, text: str) -> list[bytes]:
+        """
+        encode()内部使用的预分词函数
+        参数：
+            text: str: 文本here
+        返回：
+            pre_tokens: 分好词的字节序列列表
+        """
+        if not self.special_tokens:
+            return [match.group(0).encode("utf-8") for match in re.finditer(PAT, text)] # 按照正则的方式把text里面的句子切成子字串并且转换成了字节
+
+        special_part = "|".join(re.escape(t) for t in self.special_tokens)
+        split_them_all = re.split(f"({special_part})", text)
+        pre_tokens = []
+
+        for elem in split_them_all:
+            if not elem:
+                continue
+            if elem in self.special_tokens:
+                pre_tokens.append(elem.encode("utf-8"))
+            else:
+                pre_tokens.extend([pair.group(0).encode("utf-8") for pair in re.finditer(PAT, elem)])
+        return pre_tokens
+
+    def _apply_merges(self, byte_seq: list[bytes]) -> list[bytes]:
+        """
+        依旧encode()内部的合并函数
+        参数：
+            byte_seq: preTokenized之后逐字拆开的的单字节的序列列表
+        返回：
+            merged_group: 合并过后的单+多字节序列列表
+        """
+        merged_group = byte_seq.copy()
+        
+        merge_map = {elem: b"".join(elem) for elem in self.merges}
+        for elem in self.merges:
+            if len(merged_group) < 2: break
+            i = 0
+            while i < len(merged_group) - 1:
+                pair = (merged_group[i], merged_group[i+1])
+                if pair == elem:
+                    merged = merge_map[pair]
+                    merged_group = merged_group[:i] + [merged] + merged_group[i+2:]
+                else: 
+                    i += 1
+        return merged_group
+
     def encode(self, text: str) -> list[int]:
         """
         将输入文本编码为token ID序列
         参数：
             text: str：输入文本
         返回：
-            list[int]：token ID序列
+            token_ids: list[int]：token ID序列
         """
-        pass
+        # step one: pretokenize=)
+        pre_tokens = self._pre_tokenize(text)
+
+        token_ids = []
+        for elem in pre_tokens:
+            # step two: special token
+            if elem in self.special_byte_to_id:
+                token_ids.append(self.special_byte_to_id[elem])
+                continue
+
+            # step three: normal token
+            byte_seq = [bytes([i]) for i in pre_tokens]
+
+            # step four：apply merges
+            merged_seq = self._apply_merges(byte_seq)
+
+            # step five: 反向map
+            for j in merged_seq: token_ids.append(self.byte_to_id[j])
+
+        return token_ids
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
         """
