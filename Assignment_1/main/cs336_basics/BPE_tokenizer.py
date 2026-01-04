@@ -148,7 +148,39 @@ class Tokenizer:
         返回：
             Iterator[int]：token ID迭代器
         """
-        pass
+        residual = b"" # 残留字节
+
+        for elem in iterable:
+        # step 1 拼接+拆
+            chunk_byte = residual + elem.encode("utf-8")
+            residual = b""
+
+            # 找位置开拆
+            split_len = len(chunk_byte)
+
+            while split_len > 0:
+                try:
+                    chunk_byte[:split_len].decode("utf-8")
+                    break
+                except UnicodeDecodeError:
+                    split_len -= 1
+            if split_len == 0:
+                residual = chunk_byte
+                continue # 全是无效字节
+            
+        # step 2 拆处理过的部分和新尾巴
+            valid_bytes = chunk_byte[:split_len]
+            residual = chunk_byte[split_len:]
+            
+        # step 3 
+            valid_text = valid_bytes.decode("utf-8")
+            yield from self.encode(valid_text) # 迭代器形式把return句子换掉
+
+        # step 4 处理尾巴
+        if residual:
+            residual_part = residual.decode("utf-8", errors = "replace")
+            yield from self.encode(residual_part)
+            
 
     def decode(self, ids: list[int]) -> str:
         """
