@@ -190,4 +190,24 @@ class Tokenizer:
         返回：
             str：解码后的文本
         """
-        pass
+        # 先把id变字节
+        byte_seq =  []
+        for token_id in ids:
+            byte_seq.append(self.vocab[token_id])
+        
+        decoded_bytes = b"".join(byte_seq)
+        decoded_text = decoded_bytes.decode("utf-8")
+        return decoded_text
+    
+
+    """
+    补充: self.vocab大概长这个样子:
+        self.vocab = {
+            0: b'<|endoftext|>',
+            1: b'Hachimi',
+            2: b'!',
+            3: b' ',
+            4: b'哦啊啊'
+            }
+
+    """
