@@ -19,7 +19,7 @@ def train_bpe(input_path: str,
     tokenizer = Tokenizer(vocab = {}, merges = [], special_tokens = special_tokens)
 
     vocab = {}
-    for token_id, token_byte in tokenizer.special_byte_to_id.items():
+    for token_byte, token_id in tokenizer.special_byte_to_id.items():
         vocab[token_id] = token_byte
     initial_place = max(vocab.keys(), default = -1) + 1
     for byte in range(256):
