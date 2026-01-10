@@ -627,9 +627,6 @@ def run_train_bpe(
         if not record:
             break
 
-
-
-
         best_pair = None
         best_cnt = 0
         best_earliest = (float('inf'), float('inf')) 
@@ -646,13 +643,9 @@ def run_train_bpe(
         if best_pair is None or best_cnt <= 0:
             break
 
-
-
-
         merges.append(best_pair)
         merged_byte = b"".join(best_pair)
         vocab[len(vocab)] = merged_byte
-
 
         affected = {pos[0] for pos in record[best_pair]}        
         for index in affected:
@@ -665,7 +658,6 @@ def run_train_bpe(
                     record[old_pair].discard((index, i))
                     if not record[old_pair]:
                         del record[old_pair]
-
 
             new_seq = []
             i = 0
@@ -681,6 +673,5 @@ def run_train_bpe(
             for i in range(len(new_seq) - 1):
                 new_pair = (new_seq[i], new_seq[i+1])
                 record.setdefault(new_pair, set()).add((index, i))
-
 
     return vocab, merges
