@@ -5,6 +5,7 @@ from typing import Iterable, Iterator
 # 标准的pre-tokenize正则表达式 文件里给了的
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
+
 class Tokenizer:
     def __init__(self, vocab, merges, special_tokens=None):
         """
