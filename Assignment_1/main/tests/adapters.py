@@ -629,19 +629,21 @@ def run_train_bpe(
 
         best_pair = None
         best_cnt = 0
-        best_earliest = (float('inf'), float('inf')) 
+        candidates = []
         for pair, pos_set in record.items():
             cnt = len(pos_set)
             if cnt == 0:
                 continue
-            earliest = min(pos_set)
-            if cnt > best_cnt or (cnt == best_cnt and earliest < best_earliest):
-                best_pair = pair
+            if cnt > best_cnt:
                 best_cnt = cnt
-                best_earliest = earliest
+                candidates = [pair]
+            elif cnt == best_cnt:
+                candidates.append(pair)
 
-        if best_pair is None or best_cnt <= 0:
+        if best_cnt == 0:
             break
+
+        best_pair = max(candidates)
 
         merges.append(best_pair)
         merged_byte = b"".join(best_pair)
