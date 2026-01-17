@@ -19,7 +19,7 @@ def train_bpe(input_path: str,
     tokenizer = Tokenizer(vocab = {}, merges = [], special_tokens = special_tokens)
 
     vocab = {}
-    for token_id, token_byte in tokenizer.special_byte_to_id.items():
+    for token_byte, token_id in tokenizer.special_byte_to_id.items():
         vocab[token_id] = token_byte
     initial_place = max(vocab.keys(), default = -1) + 1
     for byte in range(256):
@@ -38,55 +38,79 @@ def train_bpe(input_path: str,
         """
         with open(input_path, "r", encoding = "utf-8") as f:
             for line in f:
-                line = line.strip()
                 if not line :
                     continue
                 yield line
     
     byte_seq = []
-    for text in _file_loader():
-        pre_tokens = tokenizer._pre_tokenize(text)
-        for elem in pre_tokens:
-            if elem in tokenizer.special_byte_to_id:
-                continue
-            single_byte_seq = [bytes([i]) for i in elem]
-            byte_seq.append(single_byte_seq)
+    with open(input_path, "r", encoding="utf-8") as f:
+        text = f.read()
+    pre_tokens = tokenizer._pre_tokenize(text)
+    for elem in pre_tokens:
+        if elem in tokenizer.special_byte_to_id:
+            continue
+        single_byte_seq = [bytes([i]) for i in elem]
+        byte_seq.append(single_byte_seq)
 
     if not byte_seq : # 注意not和is None的区别！
         return vocab, []
     
-    # 合并时间
+    record = {}
+    for index, seq in enumerate(byte_seq):
+        for i in range(len(seq) - 1):
+            pair = (seq[i], seq[i+1])
+            record.setdefault(pair, set()).add((index, i))
+
     for elem in range(max_merge_times):
-        freq = {}
-        for seq in byte_seq:
-            if len(seq) < 2:
+        if not record:
+            break
+
+        best_pair = None
+        best_cnt = 0
+        candidates = []
+        for pair, pos_set in record.items():
+            cnt = len(pos_set)
+            if cnt == 0:
                 continue
-            for i in range(len(seq) - 1):
-                pair = (seq[i], seq[i+1])
-                if pair in freq:
-                    freq[pair] += 1
-                else:
-                    freq[pair] = 1
-        if not freq: break
+            if cnt > best_cnt:
+                best_cnt = cnt
+                candidates = [pair]
+            elif cnt == best_cnt:
+                candidates.append(pair)
 
-        best_pair = max(freq, key = freq.get)
+        if best_cnt == 0:
+            break
+
+        best_pair = max(candidates)
+
         merges.append(best_pair)
-
         merged_byte = b"".join(best_pair)
         vocab[len(vocab)] = merged_byte
 
-        new_seq = []
-        for seq in byte_seq:
-            _new_seq = []
+        affected = {pos[0] for pos in record[best_pair]}        
+        for index in affected:
+            old_seq = byte_seq[index]
+            
+            for i in range(len(old_seq) - 1):
+                old_pair = (old_seq[i], old_seq[i+1])
+                if old_pair in record:
+                    record[old_pair].discard((index, i))
+                    if not record[old_pair]:
+                        del record[old_pair]
+
+            new_seq = []
             i = 0
-            while i < len(seq):
-                if i < len(seq) - 1 and (seq[i], seq[i+1]) == best_pair:
-                    _new_seq.append(merged_byte)
+            while i < len(old_seq):
+                if i < len(old_seq) - 1 and (old_seq[i], old_seq[i+1]) == best_pair:
+                    new_seq.append(merged_byte)
                     i += 2
                 else:
-                    _new_seq.append(seq[i])
+                    new_seq.append(old_seq[i])
                     i += 1
-            new_seq.append(_new_seq)
-        byte_seq = new_seq
+            byte_seq[index] = new_seq
+
+            for i in range(len(new_seq) - 1):
+                new_pair = (new_seq[i], new_seq[i+1])
+                record.setdefault(new_pair, set()).add((index, i))
 
     return vocab, merges

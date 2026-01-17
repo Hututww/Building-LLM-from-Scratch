@@ -288,7 +288,7 @@ def run_transformer_lm(
     weights: dict[str, Tensor],
     in_indices: Int[Tensor, " batch_size sequence_length"],
 ) -> Float[Tensor, " batch_size sequence_length vocab_size"]:
-    """Given the weights of a Transformer language model and input indices,
+    r"""Given the weights of a Transformer language model and input indices,
     return the output of running a forward pass on the input indices.
 
     This function should use RoPE.
@@ -600,19 +600,19 @@ def run_train_bpe(
         """
         with open(input_path, "r", encoding = "utf-8") as f:
             for line in f:
-                line = line.strip()
                 if not line :
                     continue
                 yield line
     
     byte_seq = []
-    for text in _file_loader():
-        pre_tokens = tokenizer._pre_tokenize(text)
-        for elem in pre_tokens:
-            if elem in tokenizer.special_byte_to_id:
-                continue
-            single_byte_seq = [bytes([i]) for i in elem]
-            byte_seq.append(single_byte_seq)
+    with open(input_path, "r", encoding="utf-8") as f:
+        text = f.read()
+    pre_tokens = tokenizer._pre_tokenize(text)
+    for elem in pre_tokens:
+        if elem in tokenizer.special_byte_to_id:
+            continue
+        single_byte_seq = [bytes([i]) for i in elem]
+        byte_seq.append(single_byte_seq)
 
     if not byte_seq : # 注意not和is None的区别！
         return vocab, []
@@ -653,7 +653,6 @@ def run_train_bpe(
         for index in affected:
             old_seq = byte_seq[index]
             
-
             for i in range(len(old_seq) - 1):
                 old_pair = (old_seq[i], old_seq[i+1])
                 if old_pair in record:
