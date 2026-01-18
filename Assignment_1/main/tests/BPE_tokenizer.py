@@ -15,15 +15,15 @@ class Tokenizer:
             merges: list[tuple[bytes, bytes]]：合并操作序列
             special_tokens: list[str] | None = None：特殊tokens列表（可选）
         """
-        self.vocab = vocab.copy()
-        self.merges = merges.copy()
+        self.vocab = vocab
+        self.merges = merges
         if special_tokens is not None:
-            self.special_tokens = special_tokens.copy()
+            self.special_tokens = sorted(special_tokens, key=len, reverse=True)
         else: self.special_tokens = []
 
         # 不想遍历键值对找 利用字典哈希特性做一个反映射利于编码查找
-        self.byte_to_id = {i : j for j , i in self.vocab.items()}
-        self.special_byte_to_id = {}
+        self.byte_to_id = {i : j for j , i in vocab.items()}
+        self.special_byte_to_id = {token.encode("utf-8"): self.byte_to_id.get(token.encode("utf-8")) for token in self.special_tokens}
 
         # 对于special tokens要有添加到vocab分配新id的逻辑
         new_id = max(self.vocab.keys(), default = -1) + 1
@@ -74,7 +74,7 @@ class Tokenizer:
         if not self.special_tokens:
             return [match.group(0).encode("utf-8") for match in re.finditer(PAT, text)] # 按照正则的方式把text里面的句子切成子字串并且转换成了字节
 
-        special_part = "|".join(re.escape(t) for t in self.special_tokens)
+        special_part = "|".join(re.escape(token) for token in self.special_tokens)
         split_them_all = re.split(f"({special_part})", text)
         pre_tokens = []
 
@@ -96,15 +96,13 @@ class Tokenizer:
             merged_group: 合并过后的单+多字节序列列表
         """
         merged_group = byte_seq.copy()
-        
-        merge_map = {elem: b"".join(elem) for elem in self.merges}
         for elem in self.merges:
             if len(merged_group) < 2: break
             i = 0
             while i < len(merged_group) - 1:
                 pair = (merged_group[i], merged_group[i+1])
                 if pair == elem:
-                    merged = merge_map[pair]
+                    merged = b"".join(pair) 
                     merged_group = merged_group[:i] + [merged] + merged_group[i+2:]
                 else: 
                     i += 1
@@ -148,39 +146,7 @@ class Tokenizer:
         返回：
             Iterator[int]：token ID迭代器
         """
-        residual = b"" # 残留字节
-
-        for elem in iterable:
-        # step 1 拼接+拆
-            chunk_byte = residual + elem.encode("utf-8")
-            residual = b""
-
-            # 找位置开拆
-            split_len = len(chunk_byte)
-
-            while split_len > 0:
-                try:
-                    chunk_byte[:split_len].decode("utf-8")
-                    break
-                except UnicodeDecodeError:
-                    split_len -= 1
-            if split_len == 0:
-                residual = chunk_byte
-                continue # 全是无效字节
-            
-        # step 2 拆处理过的部分和新尾巴
-            valid_bytes = chunk_byte[:split_len]
-            residual = chunk_byte[split_len:]
-            
-        # step 3 
-            valid_text = valid_bytes.decode("utf-8")
-            yield from self.encode(valid_text) # 迭代器形式把return句子换掉
-
-        # step 4 处理尾巴
-        if residual:
-            residual_part = residual.decode("utf-8", errors = "replace")
-            yield from self.encode(residual_part)
-            
+        for text in iterable: yield from self.encode(text)
 
     def decode(self, ids: list[int]) -> str:
         """
@@ -196,7 +162,7 @@ class Tokenizer:
             byte_seq.append(self.vocab[token_id])
         
         decoded_bytes = b"".join(byte_seq)
-        decoded_text = decoded_bytes.decode("utf-8")
+        decoded_text = decoded_bytes.decode("utf-8", errors="replace")
         return decoded_text
     
 
