@@ -4,12 +4,14 @@ import os
 from collections.abc import Iterable
 from typing import IO, Any, BinaryIO
 
-from .BPE_tokenizer import Tokenizer, PAT
-
 import numpy.typing as npt
 import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
+
+
+from .BPE_tokenizer import Tokenizer, PAT
+from .Transformer import Linear, Embedding
 
 def run_linear(
     d_in: int,
@@ -18,20 +20,21 @@ def run_linear(
     in_features: Float[Tensor, " ... d_in"],
 ) -> Float[Tensor, " ... d_out"]:
     """
-    Given the weights of a Linear layer, compute the transformation of a batched input.
+    给定线性层的权重，计算批处理输入的变换结果
 
     Args:
-        in_dim (int): The size of the input dimension
-        out_dim (int): The size of the output dimension
-        weights (Float[Tensor, "d_out d_in"]): The linear weights to use
-        in_features (Float[Tensor, "... d_in"]): The output tensor to apply the function to
+        in_dim (int)：输入维度的尺寸
+        out_dim (int)：输出维度的尺寸
+        weights (Tensor)：使用的线性层权重
+        in_features (Tensor)：应用该函数的输入张量
 
     Returns:
-        Float[Tensor, "... d_out"]: The transformed output of your linear module.
+        Tensor: 线性模块变换后的输出结果
     """
+    layer = Linear(d_in, d_out, device=weights.device, dtype=weights.dtype)
+    layer.load_state_dict({"weight": weights.T})
 
-    raise NotImplementedError
-
+    return layer(in_features)
 
 def run_embedding(
     vocab_size: int,
@@ -40,19 +43,21 @@ def run_embedding(
     token_ids: Int[Tensor, " ..."],
 ) -> Float[Tensor, " ... d_model"]:
     """
-    Given the weights of an Embedding layer, get the embeddings for a batch of token ids.
+    给定嵌入层的权重，获取一批令牌(token)ID 对应的嵌入向量
 
     Args:
-        vocab_size (int): The number of embeddings in the vocabulary
-        d_model (int): The size of the embedding dimension
-        weights (Float[Tensor, "vocab_size d_model"]): The embedding vectors to fetch from
-        token_ids (Int[Tensor, "..."]): The set of token ids to fetch from the Embedding layer
+        vocab_size (int)：词汇表中的嵌入数量
+        d_model (int)：嵌入向量的维度大小
+        weights (Tensor)：从中提取向量的嵌入矩阵
+        token_ids (Tensor)：要从嵌入层提取的令牌 ID 集合
 
     Returns:
-        Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
+        Float[Tensor, "... d_model"]: 由你的嵌入层返回的批处理嵌入向量.
     """
-
-    raise NotImplementedError
+    emb = Embedding(vocab_size, d_model, device=weights.device, dtype=weights.dtype)
+    emb.load_state_dict({"weight": weights})
+        
+    return emb(token_ids)
 
 
 def run_swiglu(
@@ -560,7 +565,7 @@ def get_tokenizer(
     Returns:
         A BPE tokenizer that uses the provided vocab, merges, and special tokens.
     """
-    raise NotImplementedError
+    return Tokenizer(vocab, merges, special_tokens)
 
 
 def run_train_bpe(
