@@ -62,4 +62,16 @@ class RMSNorm(nn.Module):
         """
         均方层归一化的初始化
         """
-        return
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.empty(d_model, device=device, dtype=dtype))
+        nn.init.ones_(self.weight) # 把所有东西变1
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        original_type = x.dtype
+        x_32 = x.to(torch.float32)
+
+        mean_sqr = x_32.pow(2).mean(dim = -1, keepdim=True) # 均方根
+        x_final = x_32 * torch.rsqrt(self.eps + mean_sqr) # eps作用来了
+
+        return (x_final * self.weight).to(original_type)

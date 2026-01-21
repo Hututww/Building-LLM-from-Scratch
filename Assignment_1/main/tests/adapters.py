@@ -11,7 +11,7 @@ from torch import Tensor
 
 
 from .BPE_tokenizer import Tokenizer, PAT
-from .Transformer import Linear, Embedding
+from .Transformer import Linear, Embedding, RMSNorm
 
 def run_linear(
     d_in: int,
@@ -370,21 +370,24 @@ def run_rmsnorm(
     weights: Float[Tensor, " d_model"],
     in_features: Float[Tensor, " ... d_model"],
 ) -> Float[Tensor, " ... d_model"]:
-    """Given the weights of a RMSNorm affine transform,
-    return the output of running RMSNorm on the input features.
-
-    Args:
-        d_model (int): The dimensionality of the RMSNorm input.
-        eps: (float): A value added to the denominator for numerical stability.
-        weights (Float[Tensor, "d_model"]): RMSNorm weights.
-        in_features (Float[Tensor, "... d_model"]): Input features to run RMSNorm on. Can have arbitrary leading
-            dimensions.
-
-    Returns:
-        Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
-        RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
+    给定 RMSNorm 仿射变换的权重，返回在输入特征上运行 RMSNorm 的输出结果。
+
+    参数：
+        d_model (int): RMSNorm 输入的维度尺寸
+        eps (float): 为了数值稳定性而添加到分母中的微小值
+        weights (Float[Tensor, "d_model"]): RMSNorm 的权重（缩放参数）
+        in_features (Float[Tensor, "... d_model"]): 待执行 RMSNorm 的输入特征
+            可以具有任意数量的前导维度（如 batch 或 sequence 维度）
+
+    返回值：
+        Float[Tensor, "... d_model"]: 形状与 `in_features` 相同的张量，
+        包含对 `in_features` 运行 RMSNorm 后的输出计算结果。
+    """
+    layer = RMSNorm(d_model, eps, device=weights.device, dtype=weights.dtype)
+    layer.load_state_dict({"weight": weights})
+
+    return layer(in_features) 
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
