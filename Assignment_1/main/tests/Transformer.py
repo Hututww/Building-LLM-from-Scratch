@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 
 class Linear(nn.Module):
-
+    "负责维度线性变换"
     def __init__(self, in_features, out_features, device=None, dtype=None):
         """
         负责给执行线性变换的Linear类进行初始化
@@ -33,7 +33,7 @@ class Linear(nn.Module):
         return torch.matmul(x, self.weight)
     
 class Embedding(nn.Module):
-
+    "tokenId变特征向量的编码过程"
     def __init__(self, num_embeddings, embedding_dim, device=None, dtype=None):
         """
         实现tokenId到特征向量这一转化(的初始化)
@@ -71,7 +71,51 @@ class RMSNorm(nn.Module):
         original_type = x.dtype
         x_32 = x.to(torch.float32)
 
-        mean_sqr = x_32.pow(2).mean(dim = -1, keepdim=True) # 均方根
+        mean_sqr = x_32.pow(2).mean(dim = -1, keepdim=True) # 对特征向量（横的那个）求均方根
+        """
+        t1 = [2.0, 4.0, 6.0] 
+        t2 = [1.0, 1.0, 1.0]
+
+        mean_sqr = [[[18.67], [1.0]]]
+        """
         x_final = x_32 * torch.rsqrt(self.eps + mean_sqr) # eps作用来了
 
         return (x_final * self.weight).to(original_type)
+
+class SwiGLU(nn.Module):
+    "SwiGLU前馈网络"
+    def __init__(self, d_model: int, d_ff: int | None = None, device=None, dtype=None):
+        super().__init__()
+
+        if d_ff is None:
+            d_ff = int(8.0 * d_model / 3)
+            d_ff = (d_ff + 63) // 64 * 64
+
+        self.w1 = Linear(d_model, d_ff, device=device, dtype=dtype)
+        self.w2 = Linear(d_ff, d_model, device=device, dtype=dtype)
+        self.w3 = Linear(d_model, d_ff, device=device, dtype=dtype)
+    
+    def forward(self, x: torch.Tensor):
+        # w2(SiLU(w1x) * w3x)
+        gate = self.w1(x)
+        gate_activated = torch.nn.functional.silu(gate)
+
+        info = self.w3(x)
+
+        return self.w2(gate_activated * info)
+    
+class RoPE(nn.Module):
+    "旋转位置编码"
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
+        """
+        theta: RoPE的θ
+        d_k: Query/Key 的维度
+        max_seq_len: 输入的最大序列长度
+        """
+        super().__init__()
+        self.d_k = d_k
+
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
+        return 
+
+        
