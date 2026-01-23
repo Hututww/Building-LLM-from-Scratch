@@ -104,7 +104,7 @@ class SwiGLU(nn.Module):
 
         return self.w2(gate_activated * info)
     
-class RoPE(nn.Module):
+class RotaryPositionalEmbedding(nn.Module):
     "旋转位置编码"
     def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
         """
@@ -115,7 +115,29 @@ class RoPE(nn.Module):
         super().__init__()
         self.d_k = d_k
 
+        indices = torch.arange(0, d_k, 2).float().to(device)
+        freq = 1.0 / (theta ** (indices / d_k))
+
+        position = torch.arange(max_seq_len).to(device)
+        angles = torch.outer(position, freq)
+
+        cos = angles.cos().repeat_interleave(2, dim=-1) # dim = -1代表每一行单独操作
+        sin = angles.sin().repeat_interleave(2, dim=-1)
+
+        self.register_buffer("cos_buffer", cos, persistent=False)
+        self.register_buffer("sin_buffer", sin, persistent=False)
+
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
-        return 
+
+        cos = self.cos_buffer[token_positions]
+        sin = self.sin_buffer[token_positions]
+
+        x_rotated = torch.empty_like(x)
+        # 这里的 0::2 表示：从索引 0 开始，每隔 2 个取一个（即取所有偶数位 x0, x2...）
+        # 把奇数位的值取负，填到偶数位上
+        x_rotated[..., 0::2] = -x[..., 1::2] # x_rotated = [-x1, x1, -x3, x3]
+        x_rotated[..., 1::2] = x[..., 0::2]  # x_rotated = [-x1, x0, -x3, x2]
+
+        return x * cos + x_rotated * sin
 
         
