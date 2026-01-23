@@ -11,7 +11,7 @@ from torch import Tensor
 
 
 from .BPE_tokenizer import Tokenizer, PAT
-from .Transformer import Linear, Embedding, RMSNorm
+from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding
 
 def run_linear(
     d_in: int,
@@ -68,19 +68,19 @@ def run_swiglu(
     w3_weight: Float[Tensor, " d_ff d_model"],
     in_features: Float[Tensor, " ... d_model"],
 ) -> Float[Tensor, " ... d_model"]:
-    """Given the weights of a SwiGLU network, return
-    the output of your implementation with these weights.
+    """
+    给定 SwiGLU 网络的权重，返回使用这些权重运行实现的输出结果
 
-    Args:
-        d_model (int): Dimensionality of the feedforward input and output.
-        d_ff (int): Dimensionality of the up-project happening internally to your swiglu.
-        w1_weight (Float[Tensor, "d_ff d_model"]): Stored weights for W1
-        w2_weight (Float[Tensor, "d_model d_ff"]): Stored weights for W2
-        w3_weight (Float[Tensor, "d_ff d_model"]): Stored weights for W3
-        in_features (Float[Tensor, "... d_model"]): Input embeddings to the feed-forward layer.
+    参数：
+        d_model (int): 前馈网络输入和输出的维度尺寸
+        d_ff (int): SwiGLU 内部升维变换的维度尺寸
+        w1_weight (Float[Tensor, "d_ff d_model"]): 为 W1 存储的权重
+        w2_weight (Float[Tensor, "d_model d_ff"]): 为 W2 存储的权重
+        w3_weight (Float[Tensor, "d_ff d_model"]): 为 W3 存储的权重
+        in_features (Float[Tensor, "... d_model"]): 输入到前馈层的嵌入特征
 
-    Returns:
-        Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
+    返回值：
+        Float[Tensor, "... d_model"]: 与输入嵌入特征形状相同的输出嵌入结果
     """
     # Example:
     # If your state dict keys match, you can use `load_state_dict()`
@@ -89,7 +89,14 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu = SwiGLU(d_model, d_ff=d_ff, device=w1_weight.device, dtype=w1_weight.dtype) # 设置属性 模块
+    swiglu.load_state_dict({
+        "w1.weight": w1_weight.T,
+        "w2.weight": w2_weight.T,
+        "w3.weight": w3_weight.T,
+    })
+
+    return swiglu(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -195,18 +202,26 @@ def run_rope(
     token_positions: Int[Tensor, " ... sequence_length"],
 ) -> Float[Tensor, " ... sequence_length d_k"]:
     """
-    Run RoPE for a given input tensor.
+    针对给定的输入张量运行 RoPE（旋转位置编码）
 
-    Args:
-        d_k (int): Embedding dimension size for the query or key tensor.
-        theta (float): RoPE parameter.
-        max_seq_len (int): Maximum sequence length to pre-cache if your implementation does that.
-        in_query_or_key (Float[Tensor, "... sequence_length d_k"]): Input tensor to run RoPE on.
-        token_positions (Int[Tensor, "... sequence_length"]): Tensor of shape (batch_size, sequence_length) with the token positions
-    Returns:
-        Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
+    参数：
+        d_k (int): Query 或 Key 张量的嵌入维度大小。
+        theta (float): RoPE 的参数（即公式中的 Theta）
+        max_seq_len (int): 预计算缓存支持的最大序列长度（如果你的实现包含预缓存逻辑）
+        in_query_or_key (Float[Tensor, "... sequence_length d_k"]): 需要执行 RoPE 的输入张量
+        token_positions (Int[Tensor, "... sequence_length"]): 包含每个 token 位置信息的张量，
+            通常形状为 (batch_size, sequence_length)
+
+    返回值：
+        Float[Tensor, " ... sequence_length d_k"]: 应用了 RoPE 旋转变换后的张量
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(
+        theta=theta,
+        d_k=d_k,
+        max_seq_len=max_seq_len,
+        device=in_query_or_key.device
+    )
+    return rope(in_query_or_key, token_positions)
 
 
 def run_transformer_block(
