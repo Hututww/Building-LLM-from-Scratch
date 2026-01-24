@@ -11,7 +11,7 @@ from torch import Tensor
 
 
 from .BPE_tokenizer import Tokenizer, PAT
-from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, softmax
+from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, softmax, scaled_dot_product_attention
 
 def run_linear(
     d_in: int,
@@ -106,18 +106,18 @@ def run_scaled_dot_product_attention(
     mask: Bool[Tensor, " ... queries keys"] | None = None,
 ) -> Float[Tensor, " ... queries d_v"]:
     """
-    Given key (K), query (Q), and value (V) tensors, return
-    the output of your scaled dot product attention implementation.
+    给定键 (K)、查询 (Q) 和值 (V) 张量，返回你的缩放点积注意力实现的输出结果
 
-    Args:
-        Q (Float[Tensor, " ... queries d_k"]): Query tensor
-        K (Float[Tensor, " ... keys d_k"]): Key tensor
-        V (Float[Tensor, " ... values d_v"]): Values tensor
-        mask (Bool[Tensor, " ... queries keys"] | None): Mask tensor
-    Returns:
-        Float[Tensor, " ... queries d_v"]: Output of SDPA
+    参数：
+        Q (Float[Tensor, " ... queries d_k"]): 查询 (Query) 张量
+        K (Float[Tensor, " ... keys d_k"]): 键 (Key) 张量
+        V (Float[Tensor, " ... values d_v"]): 值 (Value) 张量
+        mask (Bool[Tensor, " ... queries keys"] | None): 掩码 (Mask) 张量
+
+    返回值：
+        Float[Tensor, " ... queries d_v"]: 缩放点积注意力 (SDPA) 的输出结果
     """
-    raise NotImplementedError
+    return scaled_dot_product_attention(Q, K, V, mask)
 
 
 def run_multihead_self_attention(

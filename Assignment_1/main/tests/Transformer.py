@@ -3,11 +3,27 @@ import torch.nn as nn
 import math
 
 def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
+    """
+    把一堆原始分布变成和为1的概率分布
+    """
     max_val = x.max(dim=dim, keepdim=True).values
     exp_x = torch.exp(x - max_val)
     sum_exp = exp_x.sum(dim=dim, keepdim=True)
 
     return exp_x / sum_exp
+
+
+def scaled_dot_product_attention(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, mask: torch.Tensor | None = None):
+    d_k = query.size(-1)
+    scores = torch.matmul(query, key.transpose(-2, -1)) # 最后两维是序列长度seq_len 特征维度d_k
+    scores = scores / math.sqrt(d_k)
+    if mask is not None:
+        scores = scores.masked_fill(mask == False, -1e9)
+    
+    weights = softmax(scores, dim=-1)
+    return torch.matmul(weights, value)
+    
+
 
 class Linear(nn.Module):
     "负责维度线性变换"
