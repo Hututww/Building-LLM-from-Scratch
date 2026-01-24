@@ -2,6 +2,13 @@ import torch
 import torch.nn as nn
 import math
 
+def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
+    max_val = x.max(dim=dim, keepdim=True).values
+    exp_x = torch.exp(x - max_val)
+    sum_exp = exp_x.sum(dim=dim, keepdim=True)
+
+    return exp_x / sum_exp
+
 class Linear(nn.Module):
     "负责维度线性变换"
     def __init__(self, in_features, out_features, device=None, dtype=None):

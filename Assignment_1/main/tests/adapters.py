@@ -11,7 +11,7 @@ from torch import Tensor
 
 
 from .BPE_tokenizer import Tokenizer, PAT
-from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding
+from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, softmax
 
 def run_linear(
     d_in: int,
@@ -444,18 +444,16 @@ def run_get_batch(
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
     """
-    Given a tensor of inputs, return the output of softmaxing the given `dim`
-    of the input.
+    给定一个输入张量，返回对该输入在给定维度 `dim` 上执行 softmax 操作后的结果
 
-    Args:
-        in_features (Float[Tensor, "..."]): Input features to softmax. Shape is arbitrary.
-        dim (int): Dimension of the `in_features` to apply softmax to.
+    参数：
+        in_features (Float[Tensor, "..."]): 待执行 softmax 的输入特征。形状是任意的
+        dim (int): 对 `in_features` 应用 softmax 的维度
 
-    Returns:
-        Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
-        softmax normalizing the specified `dim`.
+    返回值：
+        Float[Tensor, "..."]: 与 `in_features` 形状相同的张量，包含在指定维度进行 softmax 归一化后的输出
     """
-    raise NotImplementedError
+    return softmax(in_features, dim)
 
 
 def run_cross_entropy(
