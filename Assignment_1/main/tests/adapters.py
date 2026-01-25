@@ -11,7 +11,7 @@ from torch import Tensor
 
 
 from .BPE_tokenizer import Tokenizer, PAT
-from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, softmax, scaled_dot_product_attention
+from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, MultiheadSelfAttention, softmax, scaled_dot_product_attention
 
 def run_linear(
     d_in: int,
@@ -151,8 +151,16 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    mha = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads, device=in_features.device)
 
+    mha.load_state_dict({
+        "w_q.weight": q_proj_weight.T,
+        "w_k.weight": k_proj_weight.T,
+        "w_v.weight": v_proj_weight.T,
+        "w_o.weight": o_proj_weight.T,
+    })
+
+    return mha(in_features)
 
 def run_multihead_self_attention_with_rope(
     d_model: int,
@@ -191,7 +199,18 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    mha = MultiheadSelfAttention(d_model=d_model, num_heads=num_heads, device=in_features.device)
+    
+    mha.rope = RotaryPositionalEmbedding(theta=theta, d_k=d_model//num_heads, max_seq_len=max_seq_len, device=in_features.device)
+    
+    mha.load_state_dict({
+        "w_q.weight": q_proj_weight.T,
+        "w_k.weight": k_proj_weight.T,
+        "w_v.weight": v_proj_weight.T,
+        "w_o.weight": o_proj_weight.T,
+    })
+
+    return mha(in_features)
 
 
 def run_rope(
