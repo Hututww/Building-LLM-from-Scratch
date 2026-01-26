@@ -210,7 +210,7 @@ def run_multihead_self_attention_with_rope(
         "w_o.weight": o_proj_weight.T,
     })
 
-    return mha(in_features)
+    return mha(in_features, token_positions)
 
 
 def run_rope(
