@@ -23,58 +23,6 @@ def scaled_dot_product_attention(query: torch.Tensor, key: torch.Tensor, value: 
     
     weights = softmax(scores, dim=-1)
     return torch.matmul(weights, value)
-    
-class MultiheadSelfAttention(nn.Module):
-    """
-    多头注意力
-    """
-    def __init__(self, d_model, num_heads, device=None, dtype=None):
-        super().__init__()
-        self.d_model = d_model
-        self.num_heads = num_heads
-        self.d_k = d_model // num_heads
-
-        self.w_q = Linear(d_model, d_model, device=device, dtype=dtype)
-        self.w_k = Linear(d_model, d_model, device=device, dtype=dtype)
-        self.w_v = Linear(d_model, d_model, device=device, dtype=dtype)
-        self.w_o = Linear(d_model, d_model, device=device, dtype=dtype)
-
-        self.rope = RotaryPositionalEmbedding(theta=10000.0, d_k=self.d_k, max_seq_len=2048, device=device)
-    
-    def forward(self, x: torch.Tensor, positions=None):
-        batch_size, seq_len, _ = x.shape
-
-        q = self.w_q(x) # (Batch, Seq_Len, num_heads, d_k)
-        k = self.w_k(x)
-        v = self.w_v(x)
-
-        # (batch, seq, num_heads, d_k) -> (batch, num_heads, seq, d_k)
-        q = q.view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2).contiguous()
-        k = k.view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2).contiguous()
-        v = v.view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2).contiguous()
-
-        # 确保内存连续后再合并 head 到 batch： (batch * num_heads, seq, d_k)
-        q_flat = q.view(batch_size * self.num_heads, seq_len, self.d_k)
-        k_flat = k.view(batch_size * self.num_heads, seq_len, self.d_k)
-
-        if positions is not None:
-            if positions.dim() == 1:
-                positions = positions.unsqueeze(0)  # (batch, seq)
-            positions = positions.to(x.device).long()
-            # 为每个 head 复制位置索引： (batch, seq) -> (batch, num_heads, seq) -> (batch*num_heads, seq)
-            positions_flat = positions.unsqueeze(1).expand(-1, self.num_heads, -1).reshape(-1, seq_len)
-            q_flat = self.rope(q_flat, positions_flat)
-            k_flat = self.rope(k_flat, positions_flat)
-
-        # 恢复回原来的形状 (batch, num_heads, seq, d_k)
-        q = q_flat.view(batch_size, self.num_heads, seq_len, self.d_k)
-        k = k_flat.view(batch_size, self.num_heads, seq_len, self.d_k)
-
-        mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device)).bool()
-        attention_output = scaled_dot_product_attention(q, k, v, mask=mask)
-        out = attention_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)
-
-        return self.w_o(out)
 
 class Linear(nn.Module):
     "负责维度线性变换"
@@ -214,4 +162,40 @@ class RotaryPositionalEmbedding(nn.Module):
 
         return x * cos + x_rotated * sin
 
-        
+class MultiheadSelfAttention(nn.Module):
+    """
+    多头注意力
+    """
+    def __init__(self, d_model, num_heads, device=None, dtype=None):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+
+        self.w_q = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.w_k = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.w_v = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.w_o = Linear(d_model, d_model, device=device, dtype=dtype)
+
+        self.rope = RotaryPositionalEmbedding(theta=10000.0, d_k=self.d_k, max_seq_len=2048, device=device)
+    
+    def forward(self, x: torch.Tensor, positions=None):
+        batch_size, seq_len, _ = x.shape
+
+        q = self.w_q(x) # (Batch, Seq_Len, num_heads, d_k)
+        k = self.w_k(x)
+        v = self.w_v(x)
+
+        # (batch, seq, num_heads, d_k) -> (batch, num_heads, seq, d_k)
+        q = q.view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2)
+        k = k.view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2)
+        v = v.view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2)
+
+        q = self.rope(q, positions)
+        k = self.rope(k, positions)
+
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device)).bool()
+        attention_output = scaled_dot_product_attention(q, k, v, mask=mask)
+        out = attention_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)
+
+        return self.w_o(out)
