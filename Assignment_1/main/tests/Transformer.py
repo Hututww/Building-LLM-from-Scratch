@@ -163,9 +163,7 @@ class RotaryPositionalEmbedding(nn.Module):
         return x * cos + x_rotated * sin
 
 class MultiheadSelfAttention(nn.Module):
-    """
-    多头注意力
-    """
+    # 多头注意力
     def __init__(self, d_model, num_heads, device=None, dtype=None):
         super().__init__()
         self.d_model = d_model
@@ -199,3 +197,63 @@ class MultiheadSelfAttention(nn.Module):
         out = attention_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)
 
         return self.w_o(out)
+
+class TransformerBlock(nn.Module):
+    # 单个的Transformer 块
+    def __init__(self, d_model: int, num_heads: int, d_ff: int, device=None, dtype=None):
+        super().__init__()
+        # 第一个子层：多头注意力
+        self.attn_norm = RMSNorm(d_model, device=device, dtype=dtype)
+        self.attn = MultiheadSelfAttention(d_model, num_heads, device=device, dtype=dtype)
+
+        # 第二个子层：前馈网络SwiGLU
+        self.ffn_norm = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+
+    def forward(self, x: torch.Tensor, positions: torch.Tensor = None):
+        """
+        x的形状: [Batch_Size, Sequence_Length, d_model]。
+
+            Batch_Size: 一批同时训练的句子数量。
+            Sequence_Length: 一句话里有多少个词 Token数。
+            d_model: 每个词被表示成了一个多长的向量。
+        """
+        # 多头注意力子层
+        x = x + self.attn(self.attn_norm(x), positions=positions)
+        
+        # 前馈网络子层
+        x = x + self.ffn(self.ffn_norm(x))
+        
+        return x
+    
+class TransformerLM(nn.Module):
+    # 属于我的flow1！
+    def __init__(self, vocab_size: int, context_length: int, d_ff: int, d_model: int, num_heads: int, num_layers: int, device=None, dtype=None):
+        super().__init__()
+        # 词嵌入层
+        self.token_embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
+        
+        # 层堆叠
+        self.layers = nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, device=device, dtype=dtype) for _ in range(num_layers)])
+
+        # 输出前的归一化
+        self.final_norm = RMSNorm(d_model, device=device, dtype=dtype)
+        
+        # 输出线性层：将特征映射回词词汇表大小
+        self.output_layer = Linear(d_model, vocab_size, device=device, dtype=dtype)
+
+    def forward(self, token_ids: torch.Tensor):
+        x = self.token_embedding(token_ids)
+        
+        # 2. 为 RoPE 准备位置索引
+        batch_size, seq_len = token_ids.shape
+        positions = torch.arange(seq_len, device=token_ids.device).unsqueeze(0).expand(batch_size, -1)
+        
+        # 逐层通过 TransformerBlock
+        for layer in self.layers:
+            x = layer(x, positions=positions)
+            
+        x = self.final_norm(x)
+        logits = self.output_layer(x)
+        
+        return logits
