@@ -12,6 +12,7 @@ from torch import Tensor
 
 from .BPE_tokenizer import Tokenizer, PAT
 from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, MultiheadSelfAttention, TransformerBlock, TransformerLM, softmax, scaled_dot_product_attention
+from .Training_Utils_for_Trans import calc_cross_entropy_loss
 
 def run_linear(
     d_in: int,
@@ -509,19 +510,18 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
 def run_cross_entropy(
     inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
 ) -> Float[Tensor, ""]:
-    """Given a tensor of inputs and targets, compute the average cross-entropy
-    loss across examples.
-
-    Args:
-        inputs (Float[Tensor, "batch_size vocab_size"]): inputs[i][j] is the
-            unnormalized logit of jth class for the ith example.
-        targets (Int[Tensor, "batch_size"]): Tensor of shape (batch_size,) with the index of the correct class.
-            Each value must be between 0 and `num_classes - 1`.
-
-    Returns:
-        Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    给定输入和目标的张量，计算所有样本的平均交叉熵损失。
+
+    参数：
+        inputs (Float[Tensor, "batch_size vocab_size"]): inputs[i][j] 是第 i 个样本中第 j 类的未归一化对数概率（logit）。
+        targets (Int[Tensor, "batch_size"]): 形状为 (batch_size,) 的张量，包含正确类别的索引。
+            每个值必须在 0 到 `num_classes - 1` 之间。
+
+    返回值：
+        Float[Tensor, ""]: 所有样本的平均交叉熵损失。
+    """
+    return calc_cross_entropy_loss(inputs, targets)
 
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
