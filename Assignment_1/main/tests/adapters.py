@@ -12,7 +12,7 @@ from torch import Tensor
 
 from .BPE_tokenizer import Tokenizer, PAT
 from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, MultiheadSelfAttention, TransformerBlock, TransformerLM, softmax, scaled_dot_product_attention
-from .Training_Utils_for_Trans import calc_cross_entropy_loss
+from .Training_Utils_for_Trans import AdamW, calc_cross_entropy_loss
 
 def run_linear(
     d_in: int,
@@ -540,7 +540,7 @@ def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return AdamW
 
 
 def run_get_lr_cosine_schedule(
