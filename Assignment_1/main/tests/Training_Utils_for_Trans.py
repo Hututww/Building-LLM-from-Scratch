@@ -16,6 +16,16 @@ def calc_cross_entropy_loss(inputs: Tensor, targets: Tensor):
 
     return torch.mean(loss)
 
+def learning_rate_schedule(alpha_max, alpha_min, t, t_w, t_c):
+    if t < t_w:
+        alpha_t = t * alpha_max / t_w
+    elif t > t_c:
+        alpha_t = alpha_min
+    else:
+        alpha_t = alpha_min + 0.5 * (1 + math.cos(math.pi * (t - t_w) / (t_c - t_w))) * (alpha_max - alpha_min)
+
+    return alpha_t
+
 class SGD(torch.optim.Optimizer):
     # 随机梯度下降
     def __init__(self, params, lr=1e-3):

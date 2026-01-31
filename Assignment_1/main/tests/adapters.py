@@ -12,7 +12,7 @@ from torch import Tensor
 
 from .BPE_tokenizer import Tokenizer, PAT
 from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, MultiheadSelfAttention, TransformerBlock, TransformerLM, softmax, scaled_dot_product_attention
-from .Training_Utils_for_Trans import AdamW, calc_cross_entropy_loss
+from .Training_Utils_for_Trans import AdamW, calc_cross_entropy_loss, learning_rate_schedule
 
 def run_linear(
     d_in: int,
@@ -551,24 +551,19 @@ def run_get_lr_cosine_schedule(
     cosine_cycle_iters: int,
 ):
     """
-    Given the parameters of a cosine learning rate decay schedule (with linear
-    warmup) and an iteration number, return the learning rate at the given
-    iteration under the specified schedule.
+    给定带有线性热身的余弦学习率衰减调度的参数以及迭代轮数，返回该迭代轮数在指定调度下的学习率。
 
-    Args:
-        it (int): Iteration number to get learning rate for.
-        max_learning_rate (float): alpha_max, the maximum learning rate for
-            cosine learning rate schedule (with warmup).
-        min_learning_rate (float): alpha_min, the minimum / final learning rate for
-            the cosine learning rate schedule (with warmup).
-        warmup_iters (int): T_w, the number of iterations to linearly warm-up
-            the learning rate.
-        cosine_cycle_iters (int): T_c, the number of cosine annealing iterations.
+    参数：
+        it (int): 获取学习率的当前迭代轮数。
+        max_learning_rate (float): alpha_max，余弦学习率调度中的最大学习率。
+        min_learning_rate (float): alpha_min，余弦学习率调度中的最小/最终学习率。
+        warmup_iters (int): T_w，学习率线性热身的迭代轮数。
+        cosine_cycle_iters (int): T_c，余弦退火迭代的总轮数。
 
-    Returns:
-        Learning rate at the given iteration under the specified schedule.
+    返回值：
+        在指定调度下，当前迭代轮数对应的学习率。
     """
-    raise NotImplementedError
+    return learning_rate_schedule(alpha_max=max_learning_rate, alpha_min=min_learning_rate, t=it, t_w=warmup_iters, t_c=cosine_cycle_iters)
 
 
 def run_save_checkpoint(
