@@ -26,6 +26,24 @@ def learning_rate_schedule(alpha_max, alpha_min, t, t_w, t_c):
 
     return alpha_t
 
+def gradient_clipping(parameters, l2_max):
+    parameters_with_grad = [elem for elem in parameters if elem.grad is not None]
+    if not parameters_with_grad: 
+        return None
+    
+    total_norm = 0.0
+    
+    for elem in parameters_with_grad:
+        param_norm = elem.grad.data.norm(2) # 计算单个参数梯度的 L2 范数
+        total_norm += param_norm.item() ** 2
+    total_norm = math.sqrt(total_norm)
+
+    epsilon = 1e-6
+
+    if total_norm > l2_max:
+        for elem in parameters_with_grad:
+            elem.grad.data.mul_(l2_max / (total_norm + epsilon))
+
 class SGD(torch.optim.Optimizer):
     # 随机梯度下降
     def __init__(self, params, lr=1e-3):
