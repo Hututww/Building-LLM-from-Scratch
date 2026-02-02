@@ -13,7 +13,7 @@ from torch import Tensor
 from .BPE_tokenizer import Tokenizer, PAT
 from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, MultiheadSelfAttention, TransformerBlock, TransformerLM, softmax, scaled_dot_product_attention
 from .Training_Utils_for_Trans import AdamW, calc_cross_entropy_loss, learning_rate_schedule
-
+from .Training_Loop import get_batch
 def run_linear(
     d_in: int,
     d_out: int,
@@ -474,23 +474,20 @@ def run_get_batch(
     dataset: npt.NDArray, batch_size: int, context_length: int, device: str
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Given a dataset (a 1D numpy array of integers) and a desired batch size and
-    context length, sample language modeling input sequences and their corresponding
-    labels from the dataset.
+    给定一个数据集（一个包含整数的一维 NumPy 数组）、理想的批量大小和上下文长度，
+    从数据集中采样出语言建模所需的输入序列及其对应的标签。
 
-    Args:
-        dataset (np.array): 1D numpy array of integer token IDs in the dataset.
-        batch_size (int): Desired batch size to sample.
-        context_length (int): Desired context length of each sampled example.
-        device (str): PyTorch device string (e.g., 'cpu' or 'cuda:0') indicating the device
-            to place the sampled input sequences and labels on.
+    参数：
+        dataset (np.array): 数据集中整数 Token ID 的一维 NumPy 数组。
+        batch_size (int): 想要采样的批量大小。
+        context_length (int): 每个采样样本的理想上下文长度。
+        device (str): PyTorch 设备字符串（例如 'cpu' 或 'cuda:0'），指明采样后的输入序列和标签应放置的设备。
 
-    Returns:
-        Tuple of torch.LongTensors of shape (batch_size, context_length). The first tuple item
-        is the sampled input sequences, and the second tuple item is the corresponding
-        language modeling labels.
+    返回值：
+        形状为 (batch_size, context_length) 的 torch.LongTensor 元组。
+        元组的第一个元素是采样的输入序列，第二个元素是对应的语言建模标签。
     """
-    raise NotImplementedError
+    return get_batch(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
