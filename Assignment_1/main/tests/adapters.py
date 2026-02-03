@@ -13,7 +13,9 @@ from torch import Tensor
 from .BPE_tokenizer import Tokenizer, PAT
 from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, MultiheadSelfAttention, TransformerBlock, TransformerLM, softmax, scaled_dot_product_attention
 from .Training_Utils_for_Trans import AdamW, calc_cross_entropy_loss, learning_rate_schedule
-from .Training_Loop import get_batch
+from .Training_Loop import get_batch, save_checkpoint, load_checkpoint
+
+
 def run_linear(
     d_in: int,
     d_out: int,
@@ -570,16 +572,15 @@ def run_save_checkpoint(
     out: str | os.PathLike | BinaryIO | IO[bytes],
 ):
     """
-    Given a model, optimizer, and an iteration number, serialize them to disk.
+    给定一个模型、优化器和迭代次数，将它们序列化并保存到磁盘。
 
-    Args:
-        model (torch.nn.Module): Serialize the state of this model.
-        optimizer (torch.optim.Optimizer): Serialize the state of this optimizer.
-        iteration (int): Serialize this value, which represents the number of training iterations
-            we've completed.
-        out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
+    参数：
+        model (torch.nn.Module): 序列化该模型的状态。
+        optimizer (torch.optim.Optimizer): 序列化该优化器的状态。
+        iteration (int): 序列化该值，它代表我们已经完成的训练迭代次数。
+        out (str | os.PathLike | BinaryIO | IO[bytes]): 用于序列化保存模型、优化器和迭代次数的路径或类文件对象。
     """
-    raise NotImplementedError
+    save_checkpoint(model, optimizer, iteration, out)
 
 
 def run_load_checkpoint(
@@ -588,19 +589,18 @@ def run_load_checkpoint(
     optimizer: torch.optim.Optimizer,
 ) -> int:
     """
-    Given a serialized checkpoint (path or file-like object), restore the
-    serialized state to the given model and optimizer.
-    Return the number of iterations that we previously serialized in
-    the checkpoint.
+    给定一个已序列化的检查点（路径或类文件对象），将序列化的状态恢复到给定的模型和优化器中。
+    返回之前在检查点中序列化的迭代次数。
 
-    Args:
-        src (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialized checkpoint.
-        model (torch.nn.Module): Restore the state of this model.
-        optimizer (torch.optim.Optimizer): Restore the state of this optimizer.
-    Returns:
-        int: the previously-serialized number of iterations.
+    参数：
+        src (str | os.PathLike | BinaryIO | IO[bytes]): 指向已序列化检查点的路径或类文件对象。
+        model (torch.nn.Module): 恢复该模型的状态。
+        optimizer (torch.optim.Optimizer): 恢复该优化器的状态。
+
+    返回值：
+        int: 之前序列化的迭代次数。
     """
-    raise NotImplementedError
+    return load_checkpoint(src, model, optimizer)
 
 
 def get_tokenizer(
