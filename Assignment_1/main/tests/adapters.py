@@ -9,7 +9,6 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-
 from .BPE_tokenizer import Tokenizer, PAT
 from .Transformer import Linear, Embedding, RMSNorm, SwiGLU, RotaryPositionalEmbedding, MultiheadSelfAttention, TransformerBlock, TransformerLM, softmax, scaled_dot_product_attention
 from .Training_Utils_for_Trans import AdamW, calc_cross_entropy_loss, learning_rate_schedule
@@ -655,27 +654,41 @@ def run_train_bpe(
         return vocab, []
     
     max_merge_times = vocab_size - initial_vocab_size
-    merges = [] 
-
-    def _file_loader() -> Iterable[str]:
-        """
-        文件读取大王来也
-        """
-        with open(input_path, "r", encoding = "utf-8") as f:
-            for line in f:
-                if not line :
-                    continue
-                yield line
-    
+    merges = []     
     byte_seq = []
     with open(input_path, "r", encoding="utf-8") as f:
-        text = f.read()
-    pre_tokens = tokenizer._pre_tokenize(text)
-    for elem in pre_tokens:
-        if elem in tokenizer.special_byte_to_id:
-            continue
-        single_byte_seq = [bytes([i]) for i in elem]
-        byte_seq.append(single_byte_seq)
+
+
+
+
+
+        line_count = 0 ###
+
+
+
+
+        for line in f: 
+            pre_tokens = tokenizer._pre_tokenize(line)
+            for elem in pre_tokens:
+                if elem in tokenizer.special_byte_to_id:
+                    continue
+                single_byte_seq = [bytes([i]) for i in elem]
+                byte_seq.append(single_byte_seq)
+
+
+
+
+
+            line_count += 1
+            if line_count % 1000 == 0:  # 每1000行打印一次进度
+                print(f"已处理 {line_count} 行")###
+
+
+
+
+
+
+
 
     if not byte_seq : # 注意not和is None的区别！
         return vocab, []
@@ -737,5 +750,5 @@ def run_train_bpe(
             for i in range(len(new_seq) - 1):
                 new_pair = (new_seq[i], new_seq[i+1])
                 record.setdefault(new_pair, set()).add((index, i))
-
+                    
     return vocab, merges
