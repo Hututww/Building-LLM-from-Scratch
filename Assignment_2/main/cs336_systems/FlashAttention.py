@@ -17,9 +17,9 @@ def _flash_fwd_kernel(Q, K, V, softmax_scale, l, output,
     stride_qm	Stride of Q's M-axis	在同一个“头”里，从第一行 Token 跳到第二行 Token 需要走多少步。
     stride_qk	Stride of Q's K-dim	    在同一行里，从第一个特征值跳到第二个特征值需要走多少步。
     """
-    program_id = tl.programid(0)
+    program_id = tl.program_id(0)
 
-    offset_headbatch = tl.programid(1)
+    offset_headbatch = tl.program_id(1)
     off_b = offset_headbatch // num_heads
     off_h = offset_headbatch % num_heads
 
@@ -38,15 +38,22 @@ def _flash_fwd_kernel(Q, K, V, softmax_scale, l, output,
     a_max = tl.full([BLOCK_M], -float('inf'), dtype=tl.float32)
     exp_sum = tl.zeros([BLOCK_M], dtype=tl.float32)
     total = tl.zeros([BLOCK_M, head_dim], dtype=tl.float32)
+
+    for start_n in range(0, seq_len, BLOCK_N):
+
     
+
+
+
+
 
 class flash_forward_pass_pytorch(torch.autograd.Function):
     @staticmethod
     def forward(ctx, Q, K, V, is_causal=False):
         """
-        纯PyTorch实现FlashAttention-2前向（作业1.3.2a要求）
+        纯PyTorch实现FlashAttention-2前向
         输入形状：[batch_size, num_heads, seq_len, head_dim]
-        输出：output, l (logsumexp)
+        输出：output, log_sum_exp
         """
         device = Q.device
         dtype = Q.dtype
@@ -92,3 +99,35 @@ class flash_forward_pass_pytorch(torch.autograd.Function):
     @staticmethod
     def backward(ctx, output, log_sum_exp):
         raise NotImplementedError("not implemented")
+    
+
+class flash_forward_pass_triton(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, Q, K, V, is_casual=False): 
+        device = Q.device
+        dtype = Q.dtype
+        batch_size, num_heads, seq_len, head_dim = Q.shape
+        softmax_scale = 1.0 / torch.sqrt(torch.tensor(head_dim))
+        BLOCK_M = 16
+        BLOCK_N = 16
+        
+        output = torch.zeros_like(Q)
+        log_sum_exp = torch.full((batch_size, num_heads, seq_len), -float('inf'), device=device, dtype=torch.float32)
+ 
+        grid = (triton.cdiv(seq_len, BLOCK_M), batch_size * num_heads)
+
+        _flash_fwd_kernel[grid](
+            Q, K, V, softmax_scale, log_sum_exp, output,
+            Q.stride(0), Q.stride(1), Q.stride(2), Q.stride(3),
+            K.stride(0), K.stride(1), K.stride(2), K.stride(3),
+            V.stride(0), V.stride(1), V.stride(2), V.stride(3),
+            output.stride(0), output.stride(1), output.stride(2), output.stride(3),
+            batch_size, num_heads, seq_len, head_dim, BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N
+        )
+
+        ctx.save_for_backward(Q, K, V, output, log_sum_exp)
+        return output, log_sum_exp
+    
+    @staticmethod
+    def backward(ctx, output, log_sum_exp):
+        raise NotImplementedError("Not Implemented")
