@@ -40,10 +40,15 @@ def _flash_fwd_kernel(Q, K, V, softmax_scale, l, output,
     total = tl.zeros([BLOCK_M, head_dim], dtype=tl.float32)
 
     for start_n in range(0, seq_len, BLOCK_N):
+        col_idx = row_n + start_n # n是列m是行k是维度
+        if col_idx < seq_len:
+            mask_n = col_idx
 
-    
+        k = tl.load(k_ptr + col_idx[:,None] * stride_kn + row_k[None,:] * stride_kk,
+                    mask = (mask_n[:,None] & (row_k[None,:] < head_dim)), other=0.0)
 
-
+        v = tl.load(v_ptr + col_idx[:,None] * stride_vn + row_k[None,:] * stride_vk,
+                    mask = (mask_n[:,None] & (row_k[None,:] < head_dim)), other=0.0)
 
 
 
