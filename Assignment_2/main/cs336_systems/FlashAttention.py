@@ -33,7 +33,7 @@ def _flash_fwd_kernel(Q, K, V, softmax_scale, l, output,
     row_n = tl.arange(0, BLOCK_N)
     row_k = tl.arange(0, head_dim)
 
-    q = tl.load(q_ptr + row_m[:, None] * stride_qm + row_k[None, :] * stride_qk)
+    q = tl.load(q_ptr + row_m[:, None] * stride_qm + row_k[None, :] * stride_qk).to(tl.float32)
 
     a_max = tl.full([BLOCK_M], -float('inf'), dtype=tl.float32)
     exp_sum = tl.zeros([BLOCK_M], dtype=tl.float32)
@@ -41,14 +41,34 @@ def _flash_fwd_kernel(Q, K, V, softmax_scale, l, output,
 
     for start_n in range(0, seq_len, BLOCK_N):
         col_idx = row_n + start_n # n是列m是行k是维度
-        if col_idx < seq_len:
-            mask_n = col_idx
 
-        k = tl.load(k_ptr + col_idx[:,None] * stride_kn + row_k[None,:] * stride_kk,
-                    mask = (mask_n[:,None] & (row_k[None,:] < head_dim)), other=0.0)
+        k = tl.load(k_ptr + col_idx[:,None] * stride_kn + row_k[None,:] * stride_kk)
 
-        v = tl.load(v_ptr + col_idx[:,None] * stride_vn + row_k[None,:] * stride_vk,
-                    mask = (mask_n[:,None] & (row_k[None,:] < head_dim)), other=0.0)
+        v = tl.load(v_ptr + col_idx[:,None] * stride_vn + row_k[None,:] * stride_vk)
+
+        scores = tl.matmul(q, k, trans_b=True) * softmax_scale
+
+        block_max = tl.max(scores, axis=1)
+
+        new_max = tl.maximum(a_max, block_max)
+        exp_scale = tl.exp(a_max - new_max)
+        exp_scores = tl.exp(scores - new_max[:, None])
+        sum_exp_block = tl.sum(exp_scores, axis=1)
+
+        exp_sum = exp_sum * exp_scale + sum_exp_block
+        weighted_v = tl.matmul(exp_scores, v)
+        total = total * exp_scale[:, None] + weighted_v
+
+        a_max = new_max
+    out = total / exp_sum[:, None]
+
+    mask_m = row_m < seq_len
+    tl.store(o_ptr + row_m[:, None] * stride_om + row_k[None, :] * stride_ok,
+             out,
+             mask=(mask_m[:, None] & (row_k[None, :] < head_dim)))
+
+    tl.store(l_ptr + row_m, a_max + tl.log(exp_sum), mask=mask_m)        
+
 
 
 
@@ -108,11 +128,11 @@ class flash_forward_pass_pytorch(torch.autograd.Function):
 
 class flash_forward_pass_triton(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, Q, K, V, is_casual=False): 
+    def forward(ctx, Q, K, V, is_causal=False): 
         device = Q.device
         dtype = Q.dtype
         batch_size, num_heads, seq_len, head_dim = Q.shape
-        softmax_scale = 1.0 / torch.sqrt(torch.tensor(head_dim))
+        softmax_scale = 1.0 / (head_dim ** 0.5)
         BLOCK_M = 16
         BLOCK_N = 16
         
