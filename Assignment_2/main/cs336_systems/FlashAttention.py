@@ -122,8 +122,23 @@ class flash_forward_pass_pytorch(torch.autograd.Function):
         return output, log_sum_exp
     
     @staticmethod
-    def backward(ctx, output, log_sum_exp):
-        raise NotImplementedError("not implemented")
+    def backward(ctx, dO):
+        """
+        反向传播：计算 dQ, dK, dV。
+        """
+        Q, K, V, softmax_scores = ctx.saved_tensors
+
+        d_scores = torch.matmul(dO, V.transpose(-2, -1))
+
+        d_softmax_scores = softmax_scores * (
+            d_scores - torch.sum(d_scores * softmax_scores, dim=-1, keepdim=True)
+        )
+
+        dQ = torch.matmul(d_softmax_scores, K)
+        dK = torch.matmul(d_softmax_scores.transpose(-2, -1), Q)
+        dV = torch.matmul(d_softmax_scores.transpose(-2, -1), dO)
+
+        return dQ, dK, dV, None
     
 
 class flash_forward_pass_triton(torch.autograd.Function):
